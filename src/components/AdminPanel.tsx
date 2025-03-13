@@ -1,0 +1,245 @@
+import React, { useState } from 'react';
+import { UserPlus, Upload, Settings } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { updateAdminAddress } from '../utils/web3';
+
+export function AdminPanel() {
+  const [mode, setMode] = useState<'add' | 'issue' | 'settings'>('add');
+  const [newAdminAddress, setNewAdminAddress] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    rollNumber: '',
+    department: '',
+    admissionYear: new Date().getFullYear(),
+    walletAddress: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      if (mode === 'settings') {
+        await updateAdminAddress(newAdminAddress);
+        toast.success('Admin address updated successfully');
+        return;
+      }
+
+      if (mode === 'add') {
+        const response = await fetch('/api/students', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to add student');
+        }
+
+        toast.success('Student added successfully');
+        setFormData({
+          name: '',
+          rollNumber: '',
+          department: '',
+          admissionYear: new Date().getFullYear(),
+          walletAddress: '',
+        });
+      } else if (mode === 'issue' && selectedFile) {
+        const formDataFile = new FormData();
+        formDataFile.append('certificate', selectedFile);
+
+        const response = await fetch(`/api/students/${formData.rollNumber}/certificate`, {
+          method: 'POST',
+          body: formDataFile,
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to issue certificate');
+        }
+
+        toast.success('Certificate issued successfully');
+        setSelectedFile(null);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Operation failed');
+      console.error('Error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-white rounded-xl shadow-md p-6">
+        <div className="flex space-x-4 mb-6">
+          <button
+            onClick={() => setMode('add')}
+            className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center space-x-2
+              ${mode === 'add' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            <UserPlus className="w-5 h-5" />
+            <span>Add Student</span>
+          </button>
+          <button
+            onClick={() => setMode('issue')}
+            className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center space-x-2
+              ${mode === 'issue' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            <Upload className="w-5 h-5" />
+            <span>Issue Certificate</span>
+          </button>
+          <button
+            onClick={() => setMode('settings')}
+            className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center space-x-2
+              ${mode === 'settings' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            <Settings className="w-5 h-5" />
+            <span>Settings</span>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'settings' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                New Admin Address
+              </label>
+              <input
+                type="text"
+                value={newAdminAddress}
+                onChange={(e) => setNewAdminAddress(e.target.value)}
+                placeholder="Enter new admin Ethereum address"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Student Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Roll Number
+                </label>
+                <input
+                  type="text"
+                  value={formData.rollNumber}
+                  onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              {mode === 'add' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Wallet Address
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.walletAddress}
+                    onChange={(e) => setFormData({ ...formData, walletAddress: e.target.value })}
+                    placeholder="Enter student's Ethereum wallet address"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Department
+                </label>
+                <input
+                  type="text"
+                  value={formData.department}
+                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Admission Year
+                </label>
+                <input
+                  type="number"
+                  value={formData.admissionYear}
+                  onChange={(e) => setFormData({ ...formData, admissionYear: parseInt(e.target.value) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  min="2000"
+                  max={new Date().getFullYear()}
+                  required
+                />
+              </div>
+
+              {mode === 'issue' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Certificate PDF
+                  </label>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={`w-full py-3 px-4 rounded-lg text-white transition-colors
+              ${isSubmitting 
+                ? 'bg-blue-400 cursor-not-allowed' 
+                : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+          >
+            {isSubmitting ? 'Processing...' : mode === 'settings' ? 'Update Admin Address' : mode === 'add' ? 'Add Student' : 'Issue Certificate'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
